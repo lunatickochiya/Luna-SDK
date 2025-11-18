@@ -117,6 +117,7 @@ jobs:
           ls
           git clone https://github.com/lunatickochiya/AP-action package/kochiya
           cd package/kochiya
+          rm -rf openwrt-*
           find . -mindepth 1 ! -path "./package" ! -path "./package/*" -exec rm -rf {} +
           cd ../..
 
