@@ -45,23 +45,23 @@ jobs:
       matrix:
         include:
           - platform: aarch64_generic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/rockchip/armv8/openwrt-sdk-24.10.2-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/rockchip/armv8/openwrt-sdk-24.10.5-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: qualcommax
-            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/qualcommax/ipq807x/openwrt-sdk-24.10.2-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/qualcommax/ipq807x/openwrt-sdk-24.10.5-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: filogic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/mediatek/filogic/openwrt-sdk-24.10.2-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/mediatek/filogic/openwrt-sdk-24.10.5-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
-          - platform: x86_64
-            sdk_url: https://downloads.openwrt.org/releases/24.10.1/targets/x86/64/openwrt-sdk-24.10.1-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+          - platform: mt7621
+            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/ramips/mt7621/openwrt-sdk-24.10.5-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: ath79
-            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/ath79/generic/openwrt-sdk-24.10.2-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/ath79/generic/openwrt-sdk-24.10.5-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
     steps:
@@ -240,7 +240,7 @@ jobs:
       uses: dev-drprasad/delete-older-releases@master
       continue-on-error: true
       with:
-        keep_latest: 24
+        keep_latest: 99
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
