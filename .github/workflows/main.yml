@@ -136,14 +136,14 @@ jobs:
 
 
           ./scripts/feeds update -a
+          rm -rf feeds/luci/applications/{luci-app-passwall,luci-app-smartdns}
+          rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls,smartdns}
           ./scripts/feeds install -a
     - name: ${{ matrix.platform }} patch and mod config
       run: |
           cd sdk
           #--------------------------------------begin_patches------------------------------------------
           echo "Start applying the patch"
-          rm -rf feeds/luci/applications/{luci-app-passwall,luci-app-smartdns}
-          rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls,smartdns}
 
 
           echo "update golang version"
