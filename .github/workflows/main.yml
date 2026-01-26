@@ -149,7 +149,7 @@ jobs:
 
           echo "update golang version"
           rm -rf feeds/packages/lang/golang
-          git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
+          git clone https://github.com/sbwml/packages_lang_golang -b 25.x feeds/packages/lang/golang
 
           echo "fixed rust host build error"
           (cd feeds/packages && curl -sL https://github.com/openwrt/packages/commit/4c8c41c023fdc40bad11cb380c3714c174206225.patch | patch -p1 && echo "Patch applied")
