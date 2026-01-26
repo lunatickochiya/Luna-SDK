@@ -28,6 +28,11 @@ echo "$(cat package-configs/openvpn.config)" >> .config
 
 }
 
+function add_smartdns_packages() {
+echo "$(cat package-configs/smartdns.config)" >> .config
+
+}
+
 
 if [ "$1" == "aria2" ]; then
 add_aria2_packages
@@ -37,6 +42,8 @@ elif [ "$1" == "curl" ]; then
 add_curl_packages
 elif [ "$1" == "openvpn" ]; then
 add_openvpn_packages
+elif [ "$1" == "smartdns" ]; then
+add_smartdns_packages
 else
 echo "Invalid argument"
 fi
