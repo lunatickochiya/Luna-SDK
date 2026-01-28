@@ -36,13 +36,13 @@ echo "$(cat package-configs/smartdns.config)" >> .config
 function use_iptables() {
 (cd feeds/base && curl -sL https://raw.githubusercontent.com/lunatickochiya/AP-action/refs/heads/master/openwrt-2410/mypatch-custom-ath79-iptables/005-fix-ipt-default.patch | patch -p1 && echo "BASE iptable Patch applied")
 
-(curl -sL https://raw.githubusercontent.com/lunatickochiya/AP-action/refs/heads/master/openwrt-2410/mypatch-custom-ath79-iptables/005-fix-ipt-default.patch | patch -p1 && echo "SDK iptable Patch applied")
+(curl -sL https://raw.githubusercontent.com/lunatickochiya/AP-action/refs/heads/master/openwrt-2410/mypatch-custom-ath79-iptables/005-fix-ipt-default.patch | patch -p1 || true && echo "SDK iptable Patch applied")
 }
 
 function use_nftables() {
 (cd feeds/base && curl -sL https://raw.githubusercontent.com/lunatickochiya/AP-action/refs/heads/master/openwrt-2410/mypatch-custom-ath79-nftables/005-fix-nft-default.patch | patch -p1 && echo "BASE nftable Patch applied")
 
-(curl -sL https://raw.githubusercontent.com/lunatickochiya/AP-action/refs/heads/master/openwrt-2410/mypatch-custom-ath79-nftables/005-fix-nft-default.patch | patch -p1 && echo "SDK nftable Patch applied")
+(curl -sL https://raw.githubusercontent.com/lunatickochiya/AP-action/refs/heads/master/openwrt-2410/mypatch-custom-ath79-nftables/005-fix-nft-default.patch | patch -p1 || true && echo "SDK nftable Patch applied")
 }
 
 if [ "$1" == "aria2" ]; then
