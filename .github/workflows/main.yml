@@ -118,6 +118,7 @@ jobs:
         echo "date2=$(date +'%Y/%m %d')" >> $GITHUB_ENV
         echo "date3=$(date +'%m.%d')" >> $GITHUB_ENV
         echo "WRT_DATE=$(TZ=UTC-8 date +"%y.%m.%d-%H.%M.%S")" >> $GITHUB_ENV
+        echo "WRT_DATE_TAG=$(TZ=UTC-8 date +"%y.%m.%d-%H")" >> $GITHUB_ENV
         chmod +x opt.sh
 
     - name: ${{ matrix.platform }} sdk download
@@ -250,7 +251,7 @@ jobs:
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-          tag_name: ${{ env.date }}
+          tag_name: ${{ env.WRT_DATE_TAG }}
           body_path: ${{ env.FIRMWARE }}/release.txt
           files: ${{ env.FIRMWARE }}/upload/*
 
