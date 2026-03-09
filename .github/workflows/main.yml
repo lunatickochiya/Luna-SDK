@@ -241,7 +241,7 @@ jobs:
           mkdir upload
           zip -jr upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}.zip bin/packages/*
           touch release.txt
-          echo "- 编译的软件包名称: \`$${{ github.event.inputs.packages }}\`" >> release.txt
+          echo "- 编译的软件包名称: \`${{ github.event.inputs.packages }}\`" >> release.txt
           echo "- 编译的软件包配置: \`${{ github.event.inputs.config_pkg }}\`" >> release.txt
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           cd ../
