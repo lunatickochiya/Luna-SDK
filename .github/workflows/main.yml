@@ -45,23 +45,23 @@ jobs:
       matrix:
         include:
           - platform: aarch64_generic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.6/targets/rockchip/armv8/openwrt-sdk-24.10.6-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/rockchip/armv8/openwrt-sdk-24.10.7-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: qualcommax
-            sdk_url: https://downloads.openwrt.org/releases/24.10.6/targets/qualcommax/ipq807x/openwrt-sdk-24.10.6-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/qualcommax/ipq807x/openwrt-sdk-24.10.7-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: filogic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.6/targets/mediatek/filogic/openwrt-sdk-24.10.6-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/mediatek/filogic/openwrt-sdk-24.10.7-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: mt7621
-            sdk_url: https://downloads.openwrt.org/releases/24.10.6/targets/ramips/mt7621/openwrt-sdk-24.10.6-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/ramips/mt7621/openwrt-sdk-24.10.7-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: ath79
-            sdk_url: https://downloads.openwrt.org/releases/24.10.6/targets/ath79/generic/openwrt-sdk-24.10.6-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/ath79/generic/openwrt-sdk-24.10.7-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
     steps:
@@ -257,12 +257,10 @@ jobs:
           body_path: ${{ env.FIRMWARE }}/release.txt
           files: ${{ env.FIRMWARE }}/upload/*
 
-    - name: Delete old Releases and Workflows
-      uses: ophub/delete-releases-workflows@main
-      with:
-          gh_token: ${{secrets.GITHUB_TOKEN}}
-          delete_releases: false
-          releases_keep_latest: 99
-          delete_tags: true
-          delete_workflows: true
-          workflows_keep_day: 20
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 90
+          keep_minimum_runs: 10
