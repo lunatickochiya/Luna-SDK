@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       packages:
-        description: 'OpenWrt 包名，逗号分隔；留空时仅使用 compile_dirs'
+        description: 'OpenWrt 包名，逗号分隔（.luci- 也兼容）；留空时仅使用 compile_dirs'
         required: false
         default: 'luci-app-argon-config,luci-app-openvpn-server-client'
 
@@ -157,6 +157,15 @@ jobs:
             value="${value%"${value##*[![:space:]]}"}"
             printf '%s' "$value"
           }
+          normalize_package_list() {
+            local value="$1"
+            value="${value//$'\r'/}"
+            value="${value//$'\n'/,}"
+            value="${value//;/,}"
+            # Accept the manual separator without treating other dots as delimiters.
+            value="${value//.luci-/,luci-}"
+            printf '%s' "$value"
+          }
           #--------------------------------------begin_patches------------------------------------------
           echo "Start applying the patch"
 
@@ -186,7 +195,8 @@ jobs:
             [ -z "$cfg" ] && continue
             bash "$GITHUB_WORKSPACE/opt.sh" "$cfg"
           done
-          IFS=',' read -r -a package_array <<< "$PACKAGES"
+          normalized_packages="$(normalize_package_list "$PACKAGES")"
+          IFS=',' read -r -a package_array <<< "$normalized_packages"
           for pkg in "${package_array[@]}"; do
             pkg="$(trim "$pkg")"
             [ -z "$pkg" ] && continue
@@ -217,6 +227,15 @@ jobs:
             local value="$1"
             value="${value#"${value%%[![:space:]]*}"}"
             value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "$value"
+          }
+          normalize_package_list() {
+            local value="$1"
+            value="${value//$'\r'/}"
+            value="${value//$'\n'/,}"
+            value="${value//;/,}"
+            # Accept the manual separator without treating other dots as delimiters.
+            value="${value//.luci-/,luci-}"
             printf '%s' "$value"
           }
 
@@ -262,12 +281,20 @@ jobs:
             echo ""
           }
 
-          IFS=',' read -r -a package_array <<< "$PACKAGES"
+          normalized_packages="$(normalize_package_list "$PACKAGES")"
+          IFS=',' read -r -a package_array <<< "$normalized_packages"
           for package in "${package_array[@]}"; do
             package="$(trim "$package")"
             [ -z "$package" ] && continue
 
-            mapfile -t package_dirs < <(find -L package -type f -path "*/$package/Makefile" -printf '%h\n')
+            package_dirs=()
+            while IFS= read -r directory; do
+              [[ -f "$directory/Makefile" ]] || continue
+              package_dirs+=("$directory")
+            done < <(
+              find package -mindepth 1 -maxdepth 5 \
+                -name "$package" \( -type d -o -type l \) -print
+            )
             if [ "${#package_dirs[@]}" -eq 0 ]; then
               echo "::error::Unable to find package '$package'. Use compile_dirs to provide its SDK directory."
               exit 1
