@@ -6,7 +6,7 @@
 
 | 输入 | 说明 |
 | --- | --- |
-| `packages` | 要按包名编译的 OpenWrt 包，逗号分隔。可留空；为兼容手动输入，`.luci-` 也会识别为包分隔符。 |
+| `packages` | 要按包名编译的 OpenWrt 包，逗号分隔。可留空。 |
 | `config_pkg` | 预置包配置，逗号分隔。可选值包括 `aria2`、`curl`、`openssl`、`openvpn`、`smartdns`、`iptables`、`nftables`。 |
 | `compile_dirs` | SDK 内要直接编译的包目录，逗号分隔。目录必须以 `package/` 或 `feeds/` 开头。 |
 | `package_files` | 要发布的文件或 glob，逗号分隔。文件名不含 `/` 时会在 `bin/packages/` 下递归匹配；留空时打包 `bin/packages/` 下的全部文件。 |
@@ -20,12 +20,6 @@
 ```text
 packages: luci-app-passwall,luci-theme-argon,luci-app-argon-config
 config_pkg: aria2,openvpn,openssl,curl
-```
-
-本次测试中的两个包应填写为：
-
-```text
-packages: luci-app-quickfile,luci-app-aurora-config
 ```
 
 直接构建指定目录，并仅发布匹配的 IPK：
