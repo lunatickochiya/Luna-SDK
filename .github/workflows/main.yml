@@ -9,30 +9,25 @@ on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
-      MACH:
-        description: 'Choose machine'
-        required: true
-        default: 'mpc1917'
-        type: choice
-        options:
-        - 'tpm312'
-        - 'mpc1917'
-        - 'r08'
-        - 'fmx1'
-      patch_repo:
-        description: 'Use json patch repo true(1) or false(0) See ReadME'
-        required: true
-        default: '{"OPENSSL_3_5": "1", "BCM_FULLCONE": "1", "MAC80211_614": "0", "TRY_BBR_V3": "1"}'
-
       packages:
-        description: 'OpenWrt packages（example: luci-app-example,luci-app-helloworld）'
-        required: true
+        description: 'OpenWrt 包名，逗号分隔；留空时仅使用 compile_dirs'
+        required: false
         default: 'luci-app-argon-config,luci-app-openvpn-server-client'
 
       config_pkg:
-        description: 'OpenWrt packages cfg（example: aria2,openvpn）'
-        required: true
+        description: 'OpenWrt 包配置，逗号分隔（示例: aria2,openvpn）'
+        required: false
         default: 'aria2,iptables'
+
+      compile_dirs:
+        description: 'SDK 内直接编译的包目录，逗号分隔（示例: package/feeds/luci/luci-app-argon-config）'
+        required: false
+        default: ''
+
+      package_files:
+        description: '发布压缩包中的文件或 glob，逗号分隔（示例: luci-app-argon*.ipk,bin/targets/**/*.bin）'
+        required: false
+        default: ''
 env:
   TZ: Asia/Shanghai
 
@@ -45,23 +40,23 @@ jobs:
       matrix:
         include:
           - platform: aarch64_generic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/rockchip/armv8/openwrt-sdk-24.10.7-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/rockchip/armv8/openwrt-sdk-24.10.8-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: qualcommax
-            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/qualcommax/ipq807x/openwrt-sdk-24.10.7-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/qualcommax/ipq807x/openwrt-sdk-24.10.8-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: filogic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/mediatek/filogic/openwrt-sdk-24.10.7-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/mediatek/filogic/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: mt7621
-            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/ramips/mt7621/openwrt-sdk-24.10.7-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/ramips/mt7621/openwrt-sdk-24.10.8-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
           - platform: ath79
-            sdk_url: https://downloads.openwrt.org/releases/24.10.7/targets/ath79/generic/openwrt-sdk-24.10.7-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/ath79/generic/openwrt-sdk-24.10.8-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_ver: "24.10"
 
     steps:
@@ -105,18 +100,6 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-        PATCH_JSON_INPUT='${{ github.event.inputs.patch_repo }}'
-        echo -e "OPENSSL_3_5=$(echo $PATCH_JSON_INPUT | jq -r ".OPENSSL_3_5")" >> $GITHUB_ENV
-        echo -e "BCM_FULLCONE=$(echo $PATCH_JSON_INPUT | jq -r ".BCM_FULLCONE")" >> $GITHUB_ENV
-        echo -e "TRY_BBR_V3=$(echo $PATCH_JSON_INPUT | jq -r ".TRY_BBR_V3")" >> $GITHUB_ENV
-        echo -e "MAC80211_614=$(echo $PATCH_JSON_INPUT | jq -r ".MAC80211_614")" >> $GITHUB_ENV
-        CONFIG_JSON_INPUT='${{ github.event.inputs.config_repo }}'
-        echo -e "Cache=$(echo $CONFIG_JSON_INPUT | jq -r ".Cache")" >> $GITHUB_ENV
-        echo -e "UPLOAD_RELEASE=$(echo $CONFIG_JSON_INPUT | jq -r ".UPLOAD_RELEASE")" >> $GITHUB_ENV
-        echo -e "ALLKMOD=$(echo $CONFIG_JSON_INPUT | jq -r ".ALLKMOD")" >> $GITHUB_ENV
-        echo "date=$(date +'%m/%d_%Y_%H/%M')" >> $GITHUB_ENV
-        echo "date2=$(date +'%Y/%m %d')" >> $GITHUB_ENV
-        echo "date3=$(date +'%m.%d')" >> $GITHUB_ENV
         echo "WRT_DATE=$(TZ=UTC-8 date +"%y.%m.%d-%H.%M.%S")" >> $GITHUB_ENV
         echo "WRT_DATE_TAG=$(TZ=UTC-8 date +"%y.%m.%d-%H")" >> $GITHUB_ENV
         chmod +x opt.sh
@@ -163,8 +146,17 @@ jobs:
           ./scripts/feeds update -i
           ./scripts/feeds install -a
     - name: ${{ matrix.platform }} patch and mod config
+      env:
+        PACKAGES: ${{ github.event.inputs.packages }}
+        CONFIG_PKG: ${{ github.event.inputs.config_pkg }}
       run: |
           cd sdk
+          trim() {
+            local value="$1"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "$value"
+          }
           #--------------------------------------begin_patches------------------------------------------
           echo "Start applying the patch"
 
@@ -188,17 +180,22 @@ jobs:
           echo "CONFIG_AUTOREMOVE=n" >> .config
           echo "CONFIG_SIGNED_PACKAGES=n" >> .config
           echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
-          IFS=',' read -r -a package_cfg <<< "${{ github.event.inputs.config_pkg }}"
+          IFS=',' read -r -a package_cfg <<< "$CONFIG_PKG"
           for cfg in "${package_cfg[@]}"; do
-          bash $GITHUB_WORKSPACE/opt.sh "$cfg"
+            cfg="$(trim "$cfg")"
+            [ -z "$cfg" ] && continue
+            bash "$GITHUB_WORKSPACE/opt.sh" "$cfg"
           done
-          IFS=',' read -r -a package_array <<< "${{ github.event.inputs.packages }}"
+          IFS=',' read -r -a package_array <<< "$PACKAGES"
           for pkg in "${package_array[@]}"; do
-          ./scripts/feeds install "$pkg"
-          echo "CONFIG_PACKAGE_$pkg=m" >> .config
+            pkg="$(trim "$pkg")"
+            [ -z "$pkg" ] && continue
+            echo "CONFIG_PACKAGE_$pkg=m" >> .config
           done
           for pkg in "${package_array[@]}"; do
-          awk -v pkg="$pkg" '$0 ~ pkg { print }' .config
+            pkg="$(trim "$pkg")"
+            [ -z "$pkg" ] && continue
+            awk -v pkg="$pkg" '$0 ~ pkg { print }' .config
           done
           cat .config
           make defconfig
@@ -211,38 +208,164 @@ jobs:
 
     - name: ${{ matrix.platform }} compile
       id: compile
+      env:
+        PACKAGES: ${{ github.event.inputs.packages }}
+        COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
       run: |
           cd sdk
-          IFS=',' read -r -a package_array <<< "${{ github.event.inputs.packages }}"
+          trim() {
+            local value="$1"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "$value"
+          }
+
+          declare -A compiled_targets
+
+          compile_directory() {
+            local directory target
+            directory="$(trim "$1")"
+            directory="${directory#./}"
+            directory="${directory%/}"
+
+            case "$directory" in
+              /*|..|../*|*/../*|*/..)
+                echo "::error::Invalid compile directory: $directory"
+                return 1
+                ;;
+              feeds/*)
+                target="package/$directory"
+                ;;
+              package/*)
+                target="$directory"
+                ;;
+              *)
+                echo "::error::compile_dirs entries must start with feeds/ or package/: $directory"
+                return 1
+                ;;
+            esac
+
+            if [[ ! -d "$directory" ]]; then
+              echo "::error::Compile directory does not exist: $directory"
+              return 1
+            fi
+
+            if [[ -n "${compiled_targets[$target]:-}" ]]; then
+              echo "-----------skip duplicate compile target $target ---------------"
+              return 0
+            fi
+
+            echo "-----------begin compile $target ---------------"
+            make "$target/compile" -j"$(nproc)" || make "$target/compile" -j1 V=s
+            compiled_targets["$target"]=1
+            echo "-----------compiled $target ---------------"
+            echo ""
+          }
+
+          IFS=',' read -r -a package_array <<< "$PACKAGES"
           for package in "${package_array[@]}"; do
-              if [ -d "feeds/lunatic7/$package" ]; then
-                  echo "-----------begin compile $package ---------------"
-                  sleep 10s
-                  make package/feeds/lunatic7/$package/compile -j$(($(nproc)+1)) || make package/feeds/lunatic7/$package/compile -j1 V=s
-                  echo "-----------compiled $package ---------------"
-                  echo ""
-              fi
-              if [ -d "package/kochiya/package/kochiya/$package" ]; then
-                  echo "-----------begin compile $package ---------------"
-                  sleep 10s
-                  make package/kochiya/package/kochiya/$package/compile -j$(nproc) || make package/kochiya/package/kochiya/$package/compile -j1 V=s
-                  echo "-----------compiled kochiya $package ---------------"
-                  echo ""
-              fi
+            package="$(trim "$package")"
+            [ -z "$package" ] && continue
+
+            mapfile -t package_dirs < <(find -L package -type f -path "*/$package/Makefile" -printf '%h\n')
+            if [ "${#package_dirs[@]}" -eq 0 ]; then
+              echo "::error::Unable to find package '$package'. Use compile_dirs to provide its SDK directory."
+              exit 1
+            fi
+
+            for directory in "${package_dirs[@]}"; do
+              compile_directory "$directory"
+            done
           done
+
+          IFS=',' read -r -a compile_dir_array <<< "$COMPILE_DIRS"
+          for directory in "${compile_dir_array[@]}"; do
+            directory="$(trim "$directory")"
+            [ -z "$directory" ] && continue
+            compile_directory "$directory"
+          done
+
+          if [ "${#compiled_targets[@]}" -eq 0 ]; then
+            echo "::error::Set packages or compile_dirs to select at least one compile target."
+            exit 1
+          fi
 
           echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Organize ${{ matrix.platform }} files
       id: organize
       if: steps.compile.outputs.status == 'success'
+      env:
+        PACKAGES: ${{ github.event.inputs.packages }}
+        CONFIG_PKG: ${{ github.event.inputs.config_pkg }}
+        COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
+        PACKAGE_FILES: ${{ github.event.inputs.package_files }}
       run: |
           cd sdk
-          mkdir upload
-          zip -jr upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}.zip bin/packages/*
-          touch release.txt
-          echo "- 编译的软件包名称: \`${{ github.event.inputs.packages }}\`" >> release.txt
-          echo "- 编译的软件包配置: \`${{ github.event.inputs.config_pkg }}\`" >> release.txt
+          trim() {
+            local value="$1"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "$value"
+          }
+
+          mkdir -p upload
+          shopt -s globstar
+          declare -A files_to_package
+          package_files_input="$(trim "$PACKAGE_FILES")"
+
+          if [[ -n "$package_files_input" ]]; then
+            IFS=',' read -r -a file_patterns <<< "$package_files_input"
+            for pattern in "${file_patterns[@]}"; do
+              pattern="$(trim "$pattern")"
+              pattern="${pattern#./}"
+              [ -z "$pattern" ] && continue
+
+              case "$pattern" in
+                /*|..|../*|*/../*|*/..)
+                  echo "::error::Invalid package_files entry: $pattern"
+                  exit 1
+                  ;;
+              esac
+
+              if [[ "$pattern" != */* ]]; then
+                pattern="bin/packages/**/$pattern"
+              fi
+
+              mapfile -t matches < <(compgen -G "$pattern" || true)
+              matched_file=false
+              for file in "${matches[@]}"; do
+                if [[ -f "$file" ]]; then
+                  files_to_package["$file"]=1
+                  matched_file=true
+                fi
+              done
+
+              if [[ "$matched_file" != true ]]; then
+                echo "::error::No files matched package_files entry: $pattern"
+                exit 1
+              fi
+            done
+          else
+            while IFS= read -r -d '' file; do
+              files_to_package["$file"]=1
+            done < <(find bin/packages -type f -print0)
+          fi
+
+          if [ "${#files_to_package[@]}" -eq 0 ]; then
+            echo "::error::No files are available to package."
+            exit 1
+          fi
+
+          zip -j upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}.zip "${!files_to_package[@]}"
+          printf '%s\n' "- 编译的软件包名称: \`$PACKAGES\`" >> release.txt
+          printf '%s\n' "- 编译的软件包配置: \`$CONFIG_PKG\`" >> release.txt
+          printf '%s\n' "- 指定编译目录: \`$COMPILE_DIRS\`" >> release.txt
+          if [[ -n "$package_files_input" ]]; then
+            printf '%s\n' "- 打包文件: \`$PACKAGE_FILES\`" >> release.txt
+          else
+            printf '%s\n' "- 打包文件: \`bin/packages/**\`" >> release.txt
+          fi
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           cd ../
           echo "status=success" >> $GITHUB_OUTPUT
