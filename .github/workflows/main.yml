@@ -19,6 +19,11 @@ on:
         required: false
         default: 'aria2,iptables'
 
+      custom_feeds:
+        description: '自定义 Feed，每行 feed_name=git_url[;branch]，优先于 lunatic7'
+        required: false
+        default: ''
+
       compile_dirs:
         description: 'SDK 内直接编译的包目录，逗号分隔（示例: package/feeds/luci/luci-app-argon-config）'
         required: false
@@ -128,16 +133,52 @@ jobs:
 
 
     - name: ${{ matrix.platform }} feeds configuration packages
+      env:
+        CUSTOM_FEEDS: ${{ github.event.inputs.custom_feeds }}
       run: |
           cd sdk
-          cat > feeds.conf.default << EOF
+          cat > feeds.conf.default <<'EOF'
           src-git base https://github.com/openwrt/openwrt.git;openwrt-${{ matrix.sdk_ver }}
           src-git packages https://github.com/openwrt/packages.git;openwrt-${{ matrix.sdk_ver }}
           src-git luci https://github.com/openwrt/luci.git;openwrt-${{ matrix.sdk_ver }}
           src-git routing https://github.com/openwrt/routing.git;openwrt-${{ matrix.sdk_ver }}
           src-git telephony https://github.com/openwrt/telephony.git;openwrt-${{ matrix.sdk_ver }}
-          src-git lunatic7 https://github.com/lunatickochiya/luna-action-packages.git
           EOF
+
+          custom_feeds_input="${CUSTOM_FEEDS//$'\r'/}"
+          declare -A feed_names
+          : > custom-feeds.list
+          while IFS= read -r entry; do
+            entry="${entry#"${entry%%[![:space:]]*}"}"
+            entry="${entry%"${entry##*[![:space:]]}"}"
+            [ -z "$entry" ] && continue
+
+            if [[ ! "$entry" =~ ^([A-Za-z0-9_]+)=(https://[^[:space:];]+)(;[A-Za-z0-9._/-]+)?$ ]]; then
+              echo "::error::Invalid custom_feeds entry: $entry"
+              echo "::error::Expected: feed_name=https://example.com/repository.git[;branch]"
+              exit 1
+            fi
+
+            feed_name="${BASH_REMATCH[1]}"
+            feed_url="${BASH_REMATCH[2]}${BASH_REMATCH[3]:-}"
+            case "$feed_name" in
+              base|packages|luci|routing|telephony|lunatic7)
+                echo "::error::Reserved custom feed name: $feed_name"
+                exit 1
+                ;;
+            esac
+            if [[ -n "${feed_names[$feed_name]:-}" ]]; then
+              echo "::error::Duplicate or reserved custom feed name: $feed_name"
+              exit 1
+            fi
+            feed_names["$feed_name"]=1
+            printf 'src-git %s %s\n' "$feed_name" "$feed_url" >> feeds.conf.default
+            printf '%s\n' "$feed_name" >> custom-feeds.list
+          done <<< "$custom_feeds_input"
+
+          # OpenWrt resolves duplicate packages using feeds.conf order.
+          echo 'src-git lunatic7 https://github.com/lunatickochiya/luna-action-packages.git' >> feeds.conf.default
+          cat feeds.conf.default
 
 
           ./scripts/feeds update -a
@@ -267,7 +308,21 @@ jobs:
             package="$(trim "$package")"
             [ -z "$package" ] && continue
 
-            mapfile -t package_dirs < <(find -L package -type f -path "*/$package/Makefile" -printf '%h\n')
+            package_dirs=()
+            if [[ -f custom-feeds.list ]]; then
+              while IFS= read -r feed_name; do
+                directory="package/feeds/$feed_name/$package"
+                if [[ -f "$directory/Makefile" ]]; then
+                  package_dirs=("$directory")
+                  echo "-----------using custom feed $feed_name for $package ---------------"
+                  break
+                fi
+              done < custom-feeds.list
+            fi
+
+            if [ "${#package_dirs[@]}" -eq 0 ]; then
+              mapfile -t package_dirs < <(find -L package -type f -path "*/$package/Makefile" -printf '%h\n')
+            fi
             if [ "${#package_dirs[@]}" -eq 0 ]; then
               echo "::error::Unable to find package '$package'. Use compile_dirs to provide its SDK directory."
               exit 1
@@ -298,6 +353,7 @@ jobs:
       env:
         PACKAGES: ${{ github.event.inputs.packages }}
         CONFIG_PKG: ${{ github.event.inputs.config_pkg }}
+        CUSTOM_FEEDS: ${{ github.event.inputs.custom_feeds }}
         COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
         PACKAGE_FILES: ${{ github.event.inputs.package_files }}
       run: |
@@ -360,6 +416,9 @@ jobs:
           zip -j upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}.zip "${!files_to_package[@]}"
           printf '%s\n' "- 编译的软件包名称: \`$PACKAGES\`" >> release.txt
           printf '%s\n' "- 编译的软件包配置: \`$CONFIG_PKG\`" >> release.txt
+          if [[ -n "$CUSTOM_FEEDS" ]]; then
+            printf '%s\n' "- 自定义 Feed: \`$CUSTOM_FEEDS\`" >> release.txt
+          fi
           printf '%s\n' "- 指定编译目录: \`$COMPILE_DIRS\`" >> release.txt
           if [[ -n "$package_files_input" ]]; then
             printf '%s\n' "- 打包文件: \`$PACKAGE_FILES\`" >> release.txt
