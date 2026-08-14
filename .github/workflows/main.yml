@@ -109,24 +109,10 @@ jobs:
         echo "WRT_DATE_TAG=$(TZ=UTC-8 date +"%y.%m.%d-%H")" >> $GITHUB_ENV
         chmod +x opt.sh
 
-    - name: Restore ${{ matrix.platform }} SDK tarball cache
-      id: sdk_tar_cache
-      uses: actions/cache/restore@v4
-      with:
-        path: sdk-cache
-        key: sdk-tar-${{ matrix.platform }}-${{ matrix.sdk_ver }}-v1
-
     - name: ${{ matrix.platform }} sdk download
       run: |
+          wget -q ${{ matrix.sdk_url }}
           file_name=$(echo ${{matrix.sdk_url}} | awk -F/ '{print $NF}')
-          mkdir -p sdk-cache
-          if [[ "${{ steps.sdk_tar_cache.outputs.cache-hit }}" == "true" ]]; then
-            echo "SDK tarball cache hit, skip download"
-            cp sdk-cache/$file_name .
-          else
-            wget -q ${{ matrix.sdk_url }}
-            cp $file_name sdk-cache/
-          fi
           mkdir sdk
           mv -f package-configs/ sdk/package-configs
           if [[ $file_name == *.tar.xz ]]; then
@@ -145,25 +131,6 @@ jobs:
           find . -mindepth 1 ! -path "./package" ! -path "./package/*" -exec rm -rf {} +
           cd ../..
 
-    - name: Save ${{ matrix.platform }} SDK tarball cache
-      if: steps.sdk_tar_cache.outputs.cache-hit != 'true'
-      continue-on-error: true
-      uses: actions/cache/save@v4
-      with:
-        path: sdk-cache
-        key: sdk-tar-${{ matrix.platform }}-${{ matrix.sdk_ver }}-v1
-
-    - name: Compute dl cache key
-      id: dl_key
-      env:
-        PACKAGES: ${{ github.event.inputs.packages }}
-        CONFIG_PKG: ${{ github.event.inputs.config_pkg }}
-        COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
-      run: |
-          pkgs_norm="$(printf '%s|%s|%s' "$PACKAGES" "$CONFIG_PKG" "$COMPILE_DIRS" | tr -d '[:space:]')"
-          DL_PKGS_HASH="$(printf '%s' "$pkgs_norm" | md5sum | awk '{print $1}')"
-          echo "DL_PKGS_HASH=$DL_PKGS_HASH" >> $GITHUB_ENV
-          echo "dl pkgs hash: $DL_PKGS_HASH"
 
     - name: ${{ matrix.platform }} feeds configuration packages
       env:
@@ -219,7 +186,6 @@ jobs:
           rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls,smartdns}
           ./scripts/feeds update -i
           ./scripts/feeds install -a
-
     - name: ${{ matrix.platform }} patch and mod config
       env:
         PACKAGES: ${{ github.event.inputs.packages }}
@@ -255,6 +221,7 @@ jobs:
           echo "CONFIG_AUTOREMOVE=n" >> .config
           echo "CONFIG_SIGNED_PACKAGES=n" >> .config
           echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
+          echo "CONFIG_CCACHE=y" >> .config
           IFS=',' read -r -a package_cfg <<< "$CONFIG_PKG"
           for cfg in "${package_cfg[@]}"; do
             cfg="$(trim "$cfg")"
@@ -275,22 +242,31 @@ jobs:
           cat .config
           make defconfig
 
+    - name: Compute build cache keys
+      id: build_keys
+      env:
+        PACKAGES: ${{ github.event.inputs.packages }}
+        CONFIG_PKG: ${{ github.event.inputs.config_pkg }}
+        COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
+      run: |
+          pkgs_norm="$(printf '%s|%s|%s' "$PACKAGES" "$CONFIG_PKG" "$COMPILE_DIRS" | tr -d '[:space:]')"
+          PKGS_HASH="$(printf '%s' "$pkgs_norm" | md5sum | awk '{print $1}')"
+          echo "PKGS_HASH=$PKGS_HASH" >> $GITHUB_ENV
+          echo "build cache pkgs hash: $PKGS_HASH"
+
     - name: Restore dl download cache
       id: dl_cache
       uses: actions/cache/restore@v4
       with:
         path: sdk/dl
-        key: dl-${{ env.DL_PKGS_HASH }}-v1
+        key: dl-${{ env.PKGS_HASH }}-v1
         restore-keys: |
           dl-
 
     - name: ${{ matrix.platform }} download
       run: |
           cd sdk
-          if [[ "${{ steps.dl_cache.outputs.cache-hit }}" == "true" ]]; then
-            echo "dl cache hit"
-          fi
-          # 缓存命中时 make download 只补齐缺失文件，很快
+          # 缓存命中时 make download 只补齐缺失文件
           make download -j$(nproc)
           find dl -size -1024c -exec ls -l {} \;
 
@@ -300,7 +276,27 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: sdk/dl
-        key: dl-${{ env.DL_PKGS_HASH }}-v1
+        key: dl-${{ env.PKGS_HASH }}-v1
+
+    - name: Restore ccache
+      id: ccache_restore
+      uses: actions/cache/restore@v4
+      with:
+        path: /home/runner/.cache/ccache
+        key: ccache-${{ matrix.sdk_ver }}-v1
+        restore-keys: |
+          ccache-
+
+    - name: Restore build/staging dir cache
+      id: build_cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          sdk/build_dir
+          sdk/staging_dir
+        key: build-${{ matrix.sdk_ver }}-${{ env.PKGS_HASH }}-v1
+        restore-keys: |
+          build-${{ matrix.sdk_ver }}-
 
     - name: ${{ matrix.platform }} compile
       id: compile
@@ -309,6 +305,14 @@ jobs:
         COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
       run: |
           cd sdk
+          # ccache：限 5GB，统计命中率；CCACHE_DIR 与缓存路径保持一致
+          mkdir -p /home/runner/.cache/ccache
+          export CCACHE_DIR=/home/runner/.cache/ccache
+          echo "ccache dir size limit 5G, use 90% max cache size"
+          ccache -M 5G || true
+          if [[ "${{ steps.ccache_restore.outputs.cache-hit }}" == "true" ]]; then
+            echo "ccache restored from cache"
+          fi
           trim() {
             local value="$1"
             value="${value#"${value%%[![:space:]]*}"}"
@@ -401,6 +405,28 @@ jobs:
           fi
 
           echo "status=success" >> $GITHUB_OUTPUT
+
+          # ccache 命中统计
+          echo "-----------ccache stats ---------------"
+          ccache -s || true
+
+    - name: Save build/staging dir cache
+      if: steps.compile.outputs.status == 'success' && steps.build_cache.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          sdk/build_dir
+          sdk/staging_dir
+        key: build-${{ matrix.sdk_ver }}-${{ env.PKGS_HASH }}-v1
+
+    - name: Save ccache
+      if: steps.ccache_restore.outputs.cache-hit != 'true' && steps.compile.outputs.status == 'success'
+      continue-on-error: true
+      uses: actions/cache/save@v4
+      with:
+        path: /home/runner/.cache/ccache
+        key: ccache-${{ matrix.sdk_ver }}-v1
 
     - name: Organize ${{ matrix.platform }} files
       id: organize

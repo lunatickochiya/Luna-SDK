@@ -16,18 +16,19 @@
 
 ## 缓存
 
-工作流使用 GitHub Actions 缓存（`actions/cache@v4`）加速重复构建，共两层：
+工作流使用 GitHub Actions 缓存（`actions/cache@v4`）加速编译，共三组：
 
-| 缓存 | Key | 内容 |
+| 缓存 | 路径 | Key |
 | --- | --- | --- |
-| SDK tarball | `sdk-tar-<platform>-<sdk_ver>-v1` | 每个平台下载的 SDK 压缩包，命中后跳过 `wget` |
-| dl | `dl-<packages/config 哈希>-v1`（带 `dl-` 前缀兜底） | `dl/` 下载的源码包，命中后 `make download` 只补齐缺失文件 |
+| dl | `sdk/dl` | `dl-<packages/config 哈希>-v1`（带 `dl-` 前缀兜底） |
+| build/staging | `sdk/build_dir`、`sdk/staging_dir` | `build-<sdk_ver>-<packages/config 哈希>-v1`（带 `build-<sdk_ver>-` 前缀兜底） |
+| ccache | `/home/runner/.cache/ccache` | `ccache-<sdk_ver>-v1`（带 `ccache-` 前缀兜底） |
 
 要点：
 
-- dl 缓存 key 基于 `packages`、`config_pkg`、`compile_dirs` 的哈希，并带 `dl-` 前缀的 `restore-keys`：即使输入变化，也会优先复用旧缓存再增量下载。
-- 所有 `save` 步骤都带 `continue-on-error`，缓存写入失败（如超出配额）不会导致构建失败。
-- SDK 压缩包缓存在同一平台（同一 SDK 版本）下永久复用；升级 SDK 版本时 key 会变化，自动重新下载。
+- `dl` 与 `build/staging` 的精确 key 基于 `packages`、`config_pkg`、`compile_dirs` 的哈希；输入变化时通过 `restore-keys` 前缀复用旧缓存，OpenWrt 的 `.config` 变更检测会自动重编受影响的包。
+- ccache 通过 `CONFIG_CCACHE=y` 启用，`CCACHE_DIR` 指向缓存目录，限 5GB；编译结束时输出命中统计（`ccache -s`）。
+- 所有 `save` 步骤都带 `continue-on-error`，缓存写入失败不会导致构建失败；仅在编译成功后保存。
 
 ## Examples
 
