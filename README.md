@@ -16,7 +16,7 @@
 
 ## 缓存
 
-工作流使用 GitHub Actions 缓存（`actions/cache@v4`）加速编译，共三组：
+工作流使用 GitHub Actions 缓存（`actions/cache@v6`）加速编译，共三组：
 
 | 缓存 | 路径 | Key |
 | --- | --- | --- |

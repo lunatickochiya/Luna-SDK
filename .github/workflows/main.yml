@@ -256,7 +256,7 @@ jobs:
 
     - name: Restore dl download cache
       id: dl_cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: sdk/dl
         key: dl-${{ env.PKGS_HASH }}-v1
@@ -273,14 +273,14 @@ jobs:
     - name: Save dl download cache
       if: steps.dl_cache.outputs.cache-hit != 'true'
       continue-on-error: true
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: sdk/dl
         key: dl-${{ env.PKGS_HASH }}-v1
 
     - name: Restore ccache
       id: ccache_restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: /home/runner/.cache/ccache
         key: ccache-${{ matrix.sdk_ver }}-v1
@@ -289,7 +289,7 @@ jobs:
 
     - name: Restore build/staging dir cache
       id: build_cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: |
           sdk/build_dir
@@ -413,7 +413,7 @@ jobs:
     - name: Save build/staging dir cache
       if: steps.compile.outputs.status == 'success' && steps.build_cache.outputs.cache-hit != 'true'
       continue-on-error: true
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: |
           sdk/build_dir
@@ -423,7 +423,7 @@ jobs:
     - name: Save ccache
       if: steps.ccache_restore.outputs.cache-hit != 'true' && steps.compile.outputs.status == 'success'
       continue-on-error: true
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: /home/runner/.cache/ccache
         key: ccache-${{ matrix.sdk_ver }}-v1
