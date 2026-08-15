@@ -11,6 +11,7 @@
 | `custom_feeds` | 自定义 Git Feed，每行 `feed_name=https://repository.git[;branch]`。同名包优先于 `lunatic7`，但不覆盖标准 OpenWrt Feed；名称只能使用字母、数字和下划线。 |
 | `compile_dirs` | SDK 内要直接编译的包目录，逗号分隔。目录必须以 `package/` 或 `feeds/` 开头。 |
 | `package_files` | 要发布的文件或 glob，逗号分隔。文件名不含 `/` 时会在 `bin/packages/` 下递归匹配；留空时打包 `bin/packages/` 下的全部文件。 |
+| `use_cache` | 是否使用 GitHub Actions 缓存加速编译，默认 `true`。设为 `false` 时跳过所有缓存步骤（restore/save）并禁用 ccache，适合排查缓存导致的构建问题。 |
 
 `MACH` 与 `patch_repo` 已移除，因为工作流没有使用它们。
 

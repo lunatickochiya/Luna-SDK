@@ -33,6 +33,12 @@ on:
         description: '发布压缩包中的文件或 glob，逗号分隔（示例: luci-app-argon*.ipk,bin/targets/**/*.bin）'
         required: false
         default: ''
+
+      use_cache:
+        description: '是否使用 GitHub Actions 缓存加速编译（true/false），关闭后跳过所有缓存步骤'
+        required: false
+        default: true
+        type: boolean
 env:
   TZ: Asia/Shanghai
 
@@ -221,7 +227,9 @@ jobs:
           echo "CONFIG_AUTOREMOVE=n" >> .config
           echo "CONFIG_SIGNED_PACKAGES=n" >> .config
           echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
-          echo "CONFIG_CCACHE=y" >> .config
+          if [[ "${{ inputs.use_cache }}" == "true" ]]; then
+            echo "CONFIG_CCACHE=y" >> .config
+          fi
           IFS=',' read -r -a package_cfg <<< "$CONFIG_PKG"
           for cfg in "${package_cfg[@]}"; do
             cfg="$(trim "$cfg")"
@@ -244,6 +252,7 @@ jobs:
 
     - name: Compute build cache keys
       id: build_keys
+      if: inputs.use_cache
       env:
         PACKAGES: ${{ github.event.inputs.packages }}
         CONFIG_PKG: ${{ github.event.inputs.config_pkg }}
@@ -256,6 +265,7 @@ jobs:
 
     - name: Restore dl download cache
       id: dl_cache
+      if: inputs.use_cache
       uses: actions/cache/restore@v6
       with:
         path: sdk/dl
@@ -271,7 +281,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
 
     - name: Save dl download cache
-      if: steps.dl_cache.outputs.cache-hit != 'true'
+      if: inputs.use_cache && steps.dl_cache.outputs.cache-hit != 'true'
       continue-on-error: true
       uses: actions/cache/save@v6
       with:
@@ -280,6 +290,7 @@ jobs:
 
     - name: Restore ccache
       id: ccache_restore
+      if: inputs.use_cache
       uses: actions/cache/restore@v6
       with:
         path: /home/runner/.cache/ccache
@@ -289,6 +300,7 @@ jobs:
 
     - name: Restore build/staging dir cache
       id: build_cache
+      if: inputs.use_cache
       uses: actions/cache/restore@v6
       with:
         path: |
@@ -305,13 +317,15 @@ jobs:
         COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
       run: |
           cd sdk
-          # ccache：限 5GB，统计命中率；CCACHE_DIR 与缓存路径保持一致
-          mkdir -p /home/runner/.cache/ccache
-          export CCACHE_DIR=/home/runner/.cache/ccache
-          echo "ccache dir size limit 5G, use 90% max cache size"
-          ccache -M 5G || true
-          if [[ "${{ steps.ccache_restore.outputs.cache-hit }}" == "true" ]]; then
-            echo "ccache restored from cache"
+          # ccache：限 5GB，统计命中率；CCACHE_DIR 与缓存路径保持一致（仅 use_cache=true 时启用）
+          if [[ "${{ inputs.use_cache }}" == "true" ]]; then
+            mkdir -p /home/runner/.cache/ccache
+            export CCACHE_DIR=/home/runner/.cache/ccache
+            echo "ccache dir size limit 5G, use 90% max cache size"
+            ccache -M 5G || true
+            if [[ "${{ steps.ccache_restore.outputs.cache-hit }}" == "true" ]]; then
+              echo "ccache restored from cache"
+            fi
           fi
           trim() {
             local value="$1"
@@ -406,12 +420,14 @@ jobs:
 
           echo "status=success" >> $GITHUB_OUTPUT
 
-          # ccache 命中统计
-          echo "-----------ccache stats ---------------"
-          ccache -s || true
+          # ccache 命中统计（仅 use_cache=true 时）
+          if [[ "${{ inputs.use_cache }}" == "true" ]]; then
+            echo "-----------ccache stats ---------------"
+            ccache -s || true
+          fi
 
     - name: Save build/staging dir cache
-      if: steps.compile.outputs.status == 'success' && steps.build_cache.outputs.cache-hit != 'true'
+      if: inputs.use_cache && steps.compile.outputs.status == 'success' && steps.build_cache.outputs.cache-hit != 'true'
       continue-on-error: true
       uses: actions/cache/save@v6
       with:
@@ -421,7 +437,7 @@ jobs:
         key: build-${{ matrix.sdk_ver }}-${{ env.PKGS_HASH }}-v1
 
     - name: Save ccache
-      if: steps.ccache_restore.outputs.cache-hit != 'true' && steps.compile.outputs.status == 'success'
+      if: inputs.use_cache && steps.ccache_restore.outputs.cache-hit != 'true' && steps.compile.outputs.status == 'success'
       continue-on-error: true
       uses: actions/cache/save@v6
       with:
