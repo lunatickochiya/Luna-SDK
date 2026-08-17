@@ -192,6 +192,11 @@ jobs:
           rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls,smartdns}
           ./scripts/feeds update -i
           ./scripts/feeds install -a
+
+          # Fix smartdns-ui build under ccache: TARGET_CC becomes "ccache <gcc>" (has a space),
+          # so the unquoted CC=$(TARGET_CC) in openwrt-smartdns/Makefile makes bash execute
+          # the compiler instead of `make`, and ld fails on PATH=.../AWS_LC_SYS_CFLAGS=.../make.
+          sed -i 's|CC=$(TARGET_CC)|CC="$(TARGET_CC)"|g' feeds/lunatic7/openwrt-smartdns/Makefile
     - name: ${{ matrix.platform }} patch and mod config
       env:
         PACKAGES: ${{ github.event.inputs.packages }}
