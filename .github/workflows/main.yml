@@ -34,36 +34,47 @@ on:
         required: false
         default: ''
 
+      sdk_version:
+        description: 'OpenWrt SDK 版本'
+        required: false
+        default: '24.10.8'
+        type: choice
+        options:
+          - '24.10.8'
+          - '25.12.5'
+
 env:
   TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: Ubuntu-22.04
-    name: Build Lunatic7 IPK [${{ matrix.platform }}]
+    name: Build Lunatic7 IPK [${{ matrix.platform }} / SDK ${{ inputs.sdk_version || '24.10.8' }}]
+    env:
+      SDK_VERSION: ${{ inputs.sdk_version || '24.10.8' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: aarch64_generic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/rockchip/armv8/openwrt-sdk-24.10.8-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_ver: "24.10"
+            sdk_target: rockchip/armv8
+            sdk_name: rockchip-armv8
 
           - platform: qualcommax
-            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/qualcommax/ipq807x/openwrt-sdk-24.10.8-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_ver: "24.10"
+            sdk_target: qualcommax/ipq807x
+            sdk_name: qualcommax-ipq807x
 
           - platform: filogic
-            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/mediatek/filogic/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_ver: "24.10"
+            sdk_target: mediatek/filogic
+            sdk_name: mediatek-filogic
 
           - platform: mt7621
-            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/ramips/mt7621/openwrt-sdk-24.10.8-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_ver: "24.10"
+            sdk_target: ramips/mt7621
+            sdk_name: ramips-mt7621
 
           - platform: ath79
-            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/ath79/generic/openwrt-sdk-24.10.8-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_ver: "24.10"
+            sdk_target: ath79/generic
+            sdk_name: ath79-generic
 
     steps:
     - name: 检查
@@ -112,8 +123,25 @@ jobs:
 
     - name: ${{ matrix.platform }} sdk download
       run: |
-          wget -q ${{ matrix.sdk_url }}
-          file_name=$(echo ${{matrix.sdk_url}} | awk -F/ '{print $NF}')
+          case "$SDK_VERSION" in
+            24.10.8)
+              SDK_BRANCH=24.10
+              SDK_GCC=13.3.0
+              ;;
+            25.12.5)
+              SDK_BRANCH=25.12
+              SDK_GCC=14.3.0
+              ;;
+            *)
+              echo "::error::Unsupported SDK version: $SDK_VERSION"
+              exit 1
+              ;;
+          esac
+          SDK_URL="https://downloads.openwrt.org/releases/$SDK_VERSION/targets/${{ matrix.sdk_target }}/openwrt-sdk-$SDK_VERSION-${{ matrix.sdk_name }}_gcc-${SDK_GCC}_musl.Linux-x86_64.tar.zst"
+          echo "SDK_BRANCH=$SDK_BRANCH" >> "$GITHUB_ENV"
+          echo "Using OpenWrt SDK $SDK_VERSION: $SDK_URL"
+          wget -q "$SDK_URL"
+          file_name="${SDK_URL##*/}"
           mkdir sdk
           mv -f package-configs/ sdk/package-configs
           if [[ $file_name == *.tar.xz ]]; then
@@ -138,12 +166,12 @@ jobs:
         CUSTOM_FEEDS: ${{ github.event.inputs.custom_feeds }}
       run: |
           cd sdk
-          cat > feeds.conf.default <<'EOF'
-          src-git base https://github.com/openwrt/openwrt.git;openwrt-${{ matrix.sdk_ver }}
-          src-git packages https://github.com/openwrt/packages.git;openwrt-${{ matrix.sdk_ver }}
-          src-git luci https://github.com/openwrt/luci.git;openwrt-${{ matrix.sdk_ver }}
-          src-git routing https://github.com/openwrt/routing.git;openwrt-${{ matrix.sdk_ver }}
-          src-git telephony https://github.com/openwrt/telephony.git;openwrt-${{ matrix.sdk_ver }}
+          cat > feeds.conf.default <<EOF
+          src-git base https://github.com/openwrt/openwrt.git;openwrt-${SDK_BRANCH}
+          src-git packages https://github.com/openwrt/packages.git;openwrt-${SDK_BRANCH}
+          src-git luci https://github.com/openwrt/luci.git;openwrt-${SDK_BRANCH}
+          src-git routing https://github.com/openwrt/routing.git;openwrt-${SDK_BRANCH}
+          src-git telephony https://github.com/openwrt/telephony.git;openwrt-${SDK_BRANCH}
           EOF
 
           custom_feeds_input="${CUSTOM_FEEDS//$'\r'/}"
@@ -416,6 +444,7 @@ jobs:
           fi
 
           zip -j upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}.zip "${!files_to_package[@]}"
+          printf '%s\n' "- OpenWrt SDK 版本: \`$SDK_VERSION\`" >> release.txt
           printf '%s\n' "- 编译的软件包名称: \`$PACKAGES\`" >> release.txt
           printf '%s\n' "- 编译的软件包配置: \`$CONFIG_PKG\`" >> release.txt
           if [[ -n "$CUSTOM_FEEDS" ]]; then

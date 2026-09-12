@@ -1,11 +1,12 @@
 # OpenWrt SDK Package Builder
 
-工作流使用 OpenWrt `24.10.8` SDK，为五个目标平台构建 IPK 包。
+工作流可选择 OpenWrt `24.10.8` 或 `25.12.5` SDK，为五个目标平台构建 IPK 包，默认使用 `24.10.8`。
 
 ## Workflow Inputs
 
 | 输入 | 说明 |
 | --- | --- |
+| `sdk_version` | SDK 版本，可选 `24.10.8` 或 `25.12.5`，默认 `24.10.8`。 |
 | `packages` | 要按包名编译的 OpenWrt 包，逗号分隔。可留空。 |
 | `config_pkg` | 预置包配置，逗号分隔。可选值包括 `aria2`、`curl`、`openssl`、`openvpn`、`smartdns`、`iptables`、`nftables`。 |
 | `custom_feeds` | 自定义 Git Feed，每行 `feed_name=https://repository.git[;branch]`。同名包优先于 `lunatic7`，但不覆盖标准 OpenWrt Feed；名称只能使用字母、数字和下划线。 |
@@ -19,6 +20,7 @@
 按包名构建：
 
 ```text
+sdk_version: 25.12.5
 packages: luci-app-passwall,luci-theme-argon,luci-app-argon-config
 config_pkg: aria2,openvpn,openssl,curl
 ```
