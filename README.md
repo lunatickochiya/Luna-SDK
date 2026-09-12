@@ -11,25 +11,8 @@
 | `custom_feeds` | 自定义 Git Feed，每行 `feed_name=https://repository.git[;branch]`。同名包优先于 `lunatic7`，但不覆盖标准 OpenWrt Feed；名称只能使用字母、数字和下划线。 |
 | `compile_dirs` | SDK 内要直接编译的包目录，逗号分隔。目录必须以 `package/` 或 `feeds/` 开头。 |
 | `package_files` | 要发布的文件或 glob，逗号分隔。文件名不含 `/` 时会在 `bin/packages/` 下递归匹配；留空时打包 `bin/packages/` 下的全部文件。 |
-| `use_cache` | 是否使用 GitHub Actions 缓存加速编译，默认 `true`。设为 `false` 时跳过所有缓存步骤（restore/save）并禁用 ccache，适合排查缓存导致的构建问题。 |
 
 `MACH` 与 `patch_repo` 已移除，因为工作流没有使用它们。
-
-## 缓存
-
-工作流使用 GitHub Actions 缓存（`actions/cache@v6`）加速编译，共三组：
-
-| 缓存 | 路径 | Key |
-| --- | --- | --- |
-| dl | `sdk/dl` | `dl-<packages/config 哈希>-v1`（带 `dl-` 前缀兜底） |
-| build/staging | `sdk/build_dir`、`sdk/staging_dir` | `build-<sdk_ver>-<packages/config 哈希>-v1`（带 `build-<sdk_ver>-` 前缀兜底） |
-| ccache | `/home/runner/.cache/ccache` | `ccache-<sdk_ver>-v1`（带 `ccache-` 前缀兜底） |
-
-要点：
-
-- `dl` 与 `build/staging` 的精确 key 基于 `packages`、`config_pkg`、`compile_dirs` 的哈希；输入变化时通过 `restore-keys` 前缀复用旧缓存，OpenWrt 的 `.config` 变更检测会自动重编受影响的包。
-- ccache 通过 `CONFIG_CCACHE=y` 启用，`CCACHE_DIR` 指向缓存目录，限 5GB；编译结束时输出命中统计（`ccache -s`）。
-- 所有 `save` 步骤都带 `continue-on-error`，缓存写入失败不会导致构建失败；仅在编译成功后保存。
 
 ## Examples
 
