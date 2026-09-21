@@ -443,7 +443,7 @@ jobs:
             exit 1
           fi
 
-          zip -j upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}.zip "${!files_to_package[@]}"
+          zip -j upload/"$WRT_DATE"_packages_ipk_${{ matrix.platform }}_"$SDK_BRANCH".zip "${!files_to_package[@]}"
           printf '%s\n' "- OpenWrt SDK 版本: \`$SDK_VERSION\`" >> release.txt
           printf '%s\n' "- 编译的软件包名称: \`$PACKAGES\`" >> release.txt
           printf '%s\n' "- 编译的软件包配置: \`$CONFIG_PKG\`" >> release.txt
