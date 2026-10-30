@@ -248,6 +248,7 @@ jobs:
           echo "CONFIG_ALL_NONSHARED=n" > .config
           echo "CONFIG_ALL_KMODS=n" >> .config
           echo "CONFIG_ALL=n" >> .config
+          echo "CONFIG_CCACHE=y" >> .config
           echo "CONFIG_AUTOREMOVE=n" >> .config
           echo "CONFIG_SIGNED_PACKAGES=n" >> .config
           echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
@@ -271,6 +272,34 @@ jobs:
           cat .config
           make defconfig
 
+    - name: Prepare ccache dir
+      run: mkdir -p sdk/.ccache
+
+    - name: Restore ccache
+      id: ccache
+      if: always()
+      uses: actions/cache/restore@main
+      with:
+        path: sdk/.ccache
+        key: sdk-ccache-${{ matrix.platform }}-${{ env.SDK_VERSION }}-${{ hashFiles('opt.sh', 'package-configs/**') }}
+        restore-keys: |
+          sdk-ccache-${{ matrix.platform }}-${{ env.SDK_VERSION }}-
+
+    - name: 准备宿主工具链（Rust/Go/LLVM/Python）
+      working-directory: ./sdk
+      run: |
+        bash "$GITHUB_WORKSPACE/.github/scripts/prepare-rust.sh" || \
+          echo "::warning ::Rust 注入失败，回退到源码构建"
+        bash "$GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh" || \
+          echo "::warning ::宿主工具链准备失败，保持默认行为"
+
+    - name: 注入编译耗时统计
+      working-directory: ./sdk
+      run: |
+        python3 "$GITHUB_WORKSPACE/.github/scripts/patch-build-time-log.py" . \
+          --scripts-dir "$GITHUB_WORKSPACE/.github/scripts" || \
+          echo "::warning ::编译耗时统计注入失败，跳过报告"
+
     - name: ${{ matrix.platform }} download
       run: |
           cd sdk
@@ -282,6 +311,9 @@ jobs:
       env:
         PACKAGES: ${{ github.event.inputs.packages }}
         COMPILE_DIRS: ${{ github.event.inputs.compile_dirs }}
+        # 每个包的 prepare/configure/compile/install 起止时间
+        BUILD_TIME_LOG: 'build-time.tsv'
+        CCACHE_MAXSIZE: '2G'
       run: |
           cd sdk
           trim() {
@@ -376,6 +408,37 @@ jobs:
           fi
 
           echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Save ccache
+      if: always() && steps.ccache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@main
+      with:
+        path: sdk/.ccache
+        key: sdk-ccache-${{ matrix.platform }}-${{ env.SDK_VERSION }}-${{ hashFiles('opt.sh', 'package-configs/**') }}
+
+    - name: 生成编译耗时报告
+      if: always()
+      continue-on-error: true
+      working-directory: ./sdk
+      run: |
+        if [ -s build-time.tsv ]; then
+          scripts/build-time-report.pl -n 30 build-time.tsv > build-time-report.txt 2>&1 || true
+          cp -f build-time-report.txt "$GITHUB_WORKSPACE/build-time-report.txt" || true
+          echo "===== 编译耗时 Top 30 ====="
+          cat build-time-report.txt || true
+        else
+          echo "::notice ::没有 build-time.tsv，跳过耗时报告"
+        fi
+
+    - name: 上传编译耗时报告
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@main
+      with:
+        name: build-time-${{ matrix.platform }}
+        path: build-time-report.txt
+        if-no-files-found: ignore
+        retention-days: 7
 
     - name: Organize ${{ matrix.platform }} files
       id: organize
