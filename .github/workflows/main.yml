@@ -246,6 +246,20 @@ jobs:
           #sed -i 's/--set=llvm\.download-ci-llvm=false/--set=llvm.download-ci-llvm=true/' feeds/packages/lang/rust/Makefile
           grep -q -- '--ci false \\' feeds/packages/lang/rust/Makefile || sed -i '/x\.py \\/a \        --ci false \\' feeds/packages/lang/rust/Makefile
 
+          echo "bump rust feed to 1.96.0 when the 24.10 feed still pins 1.94.0"
+          echo "  (quickfile 2.0.9 deps shuck-* 0.2.3 require rustc >= 1.94.1; rustup dist has"
+          echo "   no prebuilt std for mips/mipsel musl, so those targets build rust from source"
+          echo "   and need the newer toolchain — take the upstream set incl. matching patches)"
+          if grep -q '^PKG_VERSION:=1.94.0' feeds/packages/lang/rust/Makefile; then
+            echo "bump rust feed 1.94.0 -> 1.96.0"
+            rm -rf /tmp/wrt-packages-master
+            git clone -q --depth=1 --filter=blob:none --sparse https://github.com/openwrt/packages.git /tmp/wrt-packages-master
+            git -C /tmp/wrt-packages-master sparse-checkout set lang/rust
+            rm -rf feeds/packages/lang/rust
+            cp -a /tmp/wrt-packages-master/lang/rust feeds/packages/lang/rust
+            rm -rf /tmp/wrt-packages-master
+            grep -E '^(PKG_(RELEASE|VERSION|HASH)):=' feeds/packages/lang/rust/Makefile
+          fi
 
           echo "Patch application completed"
           #--------------------------------------end_patches--------------------------------------------

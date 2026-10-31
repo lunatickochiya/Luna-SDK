@@ -83,10 +83,18 @@ fi
 
 echo "Rust toolchain: $TOOLCHAIN"
 echo "Rust target:    $RUST_TARGET"
-rustup target add --toolchain "$TOOLCHAIN" "$RUST_TARGET"
+# rustup dist 对部分目标（如 mips/mipsel unknown-linux-musl）不提供预编译 std，
+# 这种目标只能走 OpenWrt 的源码构建，注入必须优雅放弃而不是让整个步骤失败。
+if ! rustup target add --toolchain "$TOOLCHAIN" "$RUST_TARGET"; then
+	echo "::warning ::rustup dist has no std for $RUST_TARGET, skip rust injection (rust feed will build from source)"
+	exit 0
+fi
 
 RUST_ROOT=$(rustup run "$TOOLCHAIN" rustc --print sysroot)
-test -d "$RUST_ROOT/lib/rustlib/$RUST_TARGET/lib"
+if ! test -d "$RUST_ROOT/lib/rustlib/$RUST_TARGET/lib"; then
+	echo "::warning ::target std missing in $TOOLCHAIN for $RUST_TARGET, skip rust injection (rust feed will build from source)"
+	exit 0
+fi
 for tool in cargo rustc rustdoc; do
 	test -x "$RUST_ROOT/bin/$tool"
 done
