@@ -5,8 +5,11 @@
 # 用 runner 自带的 rustup 替代 OpenWrt 的 rust/host 源码构建。
 #
 # 背景：feeds/packages/lang/rust 默认要从源码编 rustc，4 vCPU 上约 4 小时。
-# 这里按 feed 的 PKG_VERSION 安装同版本 rustup toolchain，补上目标 std，
-# 再把 Host/Prepare、Host/Configure、Host/Compile 置空、Host/Install 改成
+# 这里注入 runner 的 stable rustup toolchain：feed 的 PKG_VERSION 常常落后于
+# crates.io 依赖的 MSRV（如 quickfile 2.0.9 锁定的 shuck-* 0.2.3 要求
+# rustc >= 1.94.1，而 24.10 feed 的 rust 还停在 1.94.0），按 feed 版本注入会让
+# 整条 rust 编译链卡死，所以 feed 版本只作参考。补上目标 std 后，把
+# Host/Prepare、Host/Configure、Host/Compile 置空、Host/Install 改成
 # 软链，OpenWrt 就会认为 rust/host 已装好，直接使用 runner 的 rustc/cargo。
 #
 # 必须在 feeds 安装完成、.config 已生成之后运行。
@@ -69,11 +72,11 @@ if [ -z "$HOST_TRIPLE" ]; then
 	exit 0
 fi
 
-TOOLCHAIN="$FEED_VERSION-$HOST_TRIPLE"
+TOOLCHAIN="stable-$HOST_TRIPLE"
 if ! rustup toolchain list | awk '{print $1}' | grep -qx "$TOOLCHAIN"; then
-	echo "installing Rust $TOOLCHAIN (feed PKG_VERSION=$FEED_VERSION)"
-	if ! rustup toolchain install "$FEED_VERSION" --profile minimal --no-self-update; then
-		echo "::warning ::rustup cannot install $FEED_VERSION, fallback to active toolchain"
+	echo "installing Rust $TOOLCHAIN (feed PKG_VERSION=$FEED_VERSION may be older than crate MSRVs)"
+	if ! rustup toolchain install stable --profile minimal --no-self-update; then
+		echo "::warning ::rustup cannot install stable, fallback to active toolchain"
 		TOOLCHAIN=$(rustup show active-toolchain | awk '{print $1}')
 	fi
 fi
