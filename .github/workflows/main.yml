@@ -264,6 +264,24 @@ jobs:
             grep -E '^(PKG_(RELEASE|VERSION|HASH)):=' feeds/packages/lang/rust/Makefile
           fi
 
+          echo "restore quickfile arch restriction"
+          # quickfile 2.0.9 源码使用 AtomicI64/AtomicU64，mips32 的 Rust std 不提供
+          # 64 位原子类型，32 位 MIPS 上必然编译失败（run 45000552575 的 mt7621/ath79
+          # 报 E0432）。1.0.25 原本就有 @(arm||aarch64||x86_64) 限制，2.0.9 放宽成
+          # $(RUST_ARCH_DEPENDS)（含 mips/mipsel）属于上游失误。恢复原限制后，kconfig
+          # 不会在 mips/mipsel 选中该包，编译目标自动跳过（9月21日成功 run 的 mt7621
+          # 即此行为）。上游若在 git.cooluc.com/sbwml/quickfile 改用 portable-atomic
+          # 等方案修复 32 位支持，可移除本补丁。
+          sed -i '/^define Package\/quickfile$/,/^endef$/ s,DEPENDS:=$(RUST_ARCH_DEPENDS),DEPENDS:=@(arm||aarch64||x86_64),' feeds/lunatic7/quickfile/Makefile
+          case "${{ matrix.platform }}" in
+            mt7621|ath79)
+              # 只在 32 位 MIPS 上强校验：补丁没打上会先烧约 2 小时编 rust/host，
+              # 然后才在 quickfile 处失败，宁可立刻报错。
+              grep -q 'DEPENDS:=@(arm||aarch64||x86_64)' feeds/lunatic7/quickfile/Makefile \
+                || { echo "::error::quickfile arch patch failed (upstream Makefile changed?)"; exit 1; }
+              ;;
+          esac
+
           echo "Patch application completed"
           #--------------------------------------end_patches--------------------------------------------
 
