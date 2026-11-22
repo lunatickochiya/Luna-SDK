@@ -41,7 +41,7 @@ on:
         type: choice
         options:
           - '24.10.8'
-          - '25.12.5'
+          - '25.12.6'
 
 env:
   TZ: Asia/Shanghai
@@ -128,7 +128,7 @@ jobs:
               SDK_BRANCH=24.10
               SDK_GCC=13.3.0
               ;;
-            25.12.5)
+            25.12.6)
               SDK_BRANCH=25.12
               SDK_GCC=14.3.0
               ;;
