@@ -239,7 +239,10 @@ jobs:
 
           echo "update golang version"
           rm -rf feeds/packages/lang/golang
-          git clone https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
+          # sbwml 仓库的默认分支始终是最新 golang feed（当前 27.x = go1.27.x，
+          # 与 go.dev 最新稳定版一致）。跟随默认分支，之后 Go 出新版无需再手动改这里。
+          git clone https://github.com/sbwml/packages_lang_golang feeds/packages/lang/golang
+          echo "golang feed: $(sed -n 's/^GO_VERSION_MAJOR_MINOR:=/go/p;s/^GO_VERSION_PATCH:=/./p' feeds/packages/lang/golang/golang/Makefile | tr -d '\n')"
 
           echo "fixed rust host build error"
           # (cd feeds/packages && curl -sL https://github.com/openwrt/packages/commit/0bcc41f3617e9041513a779a8a54f7fecae1efcd.patch | patch -p1 && echo "Rust 1.94.0 Patch applied")
@@ -322,7 +325,11 @@ jobs:
     - name: ${{ matrix.platform }} download
       run: |
           cd sdk
-          make download -j$(nproc)
+          # 并行非 verbose 模式下 OpenWrt 会吞掉失败命令的全部输出（include/verbose.mk
+          # 的 SILENT 重定向 >/dev/null 2>&1），失败时日志里只剩一句 "build failed"，
+          # 真实错误不可见（如 run 41194995825 的 openlist2 前端 404）。失败时用
+          # -j1 V=s 重试：把真实错误打进日志，偶发的下载竞态也能自愈。
+          make download -j$(nproc) || make download -j1 V=s
           find dl -size -1024c -exec ls -l {} \;
 
     - name: ${{ matrix.platform }} compile
